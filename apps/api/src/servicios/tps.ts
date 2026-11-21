@@ -1,5 +1,5 @@
 import { validarPostulacion } from '@bienestar/compartido';
-import type { Comprobante, Oferta } from '@bienestar/compartido';
+import type { Comprobante, Oferta, Postulacion } from '@bienestar/compartido';
 import { entorno } from '../config/entorno';
 import { consultarDisciplinas, guardarPostulacion } from '../repositorios/tps';
 
@@ -26,6 +26,31 @@ export async function obtenerOferta(): Promise<Oferta> {
   };
 }
 
+async function enviarAGoogleSheets(datos: Postulacion, radicado: string) {
+  const url = process.env.GOOGLE_SHEETS_WEBHOOK_URL?.trim();
+  const token = process.env.WEBHOOK_TOKEN?.trim();
+  if (!url && !token) return;
+
+  if (!url || !token || !/^https:\/\/script\.google\.com\/(?:a\/macros\/[\w.-]+\/|macros\/)s\/[\w-]+\/exec$/.test(url)) {
+    console.warn('Google Sheets: revisa GOOGLE_SHEETS_WEBHOOK_URL y WEBHOOK_TOKEN.');
+    return;
+  }
+
+  try {
+    const respuesta = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...datos, radicado, token }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!respuesta.ok || (await respuesta.json())?.ok !== true) {
+      console.warn('Google Sheets rechazó la postulación', radicado);
+    }
+  } catch {
+    console.warn('No se pudo confirmar el envío a Google Sheets', radicado);
+  }
+}
+
 export async function registrarPostulacion(entrada: unknown): Promise<
   { comprobante: Comprobante } | { errores: Record<string, string>; cupoAgotado?: true }
 > {
@@ -46,5 +71,6 @@ export async function registrarPostulacion(entrada: unknown): Promise<
     return { cupoAgotado: true, errores: { disciplinaId: 'No quedan cupos en esta disciplina. Elige otra.' } };
   }
   const { registro, cuposDisponibles } = guardado;
+  await enviarAGoogleSheets(validacion.data, registro.id);
   return { comprobante: { ...registro, creadaEn: registro.creadaEn.toISOString(), cuposDisponibles } };
 }
