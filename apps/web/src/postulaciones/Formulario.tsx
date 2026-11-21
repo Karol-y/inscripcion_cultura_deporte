@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { validarPostulacion } from '@bienestar/compartido';
+import { campusDisponibles, validarPostulacion } from '@bienestar/compartido';
 import type { Comprobante, Oferta } from '@bienestar/compartido';
 import { enviarPostulacion, ErrorApi } from '../api/tps';
 import type { Errores } from '../api/tps';
@@ -9,6 +9,7 @@ const campos = [
   { id: 'nombre', etiqueta: 'Nombre completo', maxLength: 120, autoComplete: 'name' },
   { id: 'documento', etiqueta: 'Documento o código estudiantil', maxLength: 40 },
   { id: 'correo', etiqueta: 'Correo institucional', maxLength: 254, type: 'email', autoComplete: 'email' },
+  { id: 'campus', etiqueta: 'Campus' },
   { id: 'programa', etiqueta: 'Programa académico', maxLength: 120 },
   { id: 'promedio', etiqueta: 'Promedio (0 a 5)', maxLength: 8, inputMode: 'decimal' as const },
 ] as const;
@@ -17,15 +18,18 @@ interface Props {
   oferta: Oferta;
   disciplinaId: string;
   seleccionar: (id: string) => void;
+  actualizarCupos: (id: string, disponibles: number) => void;
 }
 
-export function Formulario({ oferta, disciplinaId, seleccionar }: Props) {
+export function Formulario({ oferta, disciplinaId, seleccionar, actualizarCupos }: Props) {
   const [errores, setErrores] = useState<Errores>({});
   const [enviando, setEnviando] = useState(false);
   const [comprobante, setComprobante] = useState<Comprobante>();
   const resumen = useRef<HTMLParagraphElement>(null);
   const confirmacion = useRef<HTMLParagraphElement>(null);
   const formulario = useRef<HTMLFormElement>(null);
+  const disciplina = oferta.disciplinas.find(({ id }) => id === disciplinaId);
+  const agotada = disciplina?.cuposDisponibles === 0;
 
   useEffect(() => {
     if (Object.keys(errores).length) resumen.current?.focus();
@@ -37,7 +41,7 @@ export function Formulario({ oferta, disciplinaId, seleccionar }: Props) {
 
   async function enviar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
-    if (enviando) return;
+    if (enviando || agotada) return;
     const form = evento.currentTarget;
     const datos = Object.fromEntries(new FormData(form));
     const promedio = String(datos.promedio ?? '').trim();
@@ -55,11 +59,14 @@ export function Formulario({ oferta, disciplinaId, seleccionar }: Props) {
     setErrores({});
     setEnviando(true);
     try {
-      setComprobante(await enviarPostulacion(resultado.data));
+      const recibida = await enviarPostulacion(resultado.data);
+      actualizarCupos(resultado.data.disciplinaId, recibida.cuposDisponibles);
+      setComprobante(recibida);
       form.reset();
       seleccionar('');
     } catch (error) {
       const api = error instanceof ErrorApi ? error : new ErrorApi('No se pudo enviar la postulación.');
+      if (api.estado === 409) actualizarCupos(resultado.data.disciplinaId, 0);
       setErrores({ formulario: api.message, ...api.errores });
     } finally {
       setEnviando(false);
@@ -100,8 +107,13 @@ export function Formulario({ oferta, disciplinaId, seleccionar }: Props) {
       <legend className="sr-only">Datos de la postulación</legend>
       {campos.map(({ id, etiqueta, ...opciones }) => <div key={id}>
         <label htmlFor={id} className="mb-1.5 block font-semibold">{etiqueta}</label>
-        <input {...atributos(id)} {...opciones} />
-        {id === 'correo' && <p id="ayuda-correo" className="mt-1 text-sm text-slate-700">Usa un correo @{oferta.dominioInstitucional}.</p>}
+        {id === 'campus' ? (
+          <select {...atributos(id)} defaultValue="">
+            <option value="">Selecciona un campus</option>
+            {campusDisponibles.map((campus) => <option key={campus} value={campus}>{campus}</option>)}
+          </select>
+        ) : <input {...atributos(id)} {...opciones} />}
+        {id === 'correo' && <p id="ayuda-correo" className="mt-1 text-sm text-slate-700">Usa tu correo @{oferta.dominioInstitucional}.</p>}
         {errorCampo(id)}
       </div>)}
       <div>
@@ -109,13 +121,18 @@ export function Formulario({ oferta, disciplinaId, seleccionar }: Props) {
         <select {...atributos('disciplinaId')} value={disciplinaId} onChange={(evento) => {
           setComprobante(undefined);
           seleccionar(evento.target.value);
+          setErrores(({ disciplinaId: _disciplina, formulario: _formulario, ...resto }) => resto);
         }}>
-          <option value="">Selecciona una disciplina</option>
-          {oferta.disciplinas.map(({ id, nombre }) => <option key={id} value={id}>{nombre}</option>)}
+          <option value="">Seleccione una disciplina</option>
+          {oferta.disciplinas.map(({ id, nombre, cuposDisponibles }) => (
+            <option key={id} value={id} disabled={cuposDisponibles === 0}>
+              {nombre}
+            </option>
+          ))}
         </select>
         {errorCampo('disciplinaId')}
       </div>
-      <button className="boton justify-self-start" type="submit">{enviando ? 'Enviando…' : 'Enviar postulación'}</button>
+      <button className="boton self-start justify-self-start py-2.5 sm:self-end" type="submit" disabled={agotada}>{enviando ? 'Enviando…' : 'Enviar postulación'}</button>
     </fieldset>
   </form>;
 }

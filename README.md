@@ -1,6 +1,8 @@
 # Portal de Inscripción a Bienestar Universitario
 
-La Iteración 1 implementa HU1 y HU2. El catálogo público muestra seis disciplinas de ejemplo con su descripción, tipo y horarios. El formulario guarda la postulación con fecha, estado `RECIBIDA` y un radicado.
+La Iteración 1 implementa HU1 y HU2. El catálogo público muestra disciplinas deportivas y culturales. Para las nuevas disciplinas se usan 20 cupos iniciales de desarrollo y se muestran los horarios como «Por definir». El formulario guarda la postulación con fecha, estado `RECIBIDA` y un radicado.
+
+Cada postulación recibida reserva un cupo. El catálogo muestra los cupos restantes de cada disciplina y la API devuelve HTTP 409 si la disciplina se agotó. Los cupos máximos de la oferta de ejemplo se definen en `apps/api/prisma/seed.ts` al crear las disciplinas.
 
 ## Requisitos
 
@@ -23,7 +25,7 @@ npm run dev
 
 En Bash, usa `cp .env.example .env` para el primer paso. Abre http://127.0.0.1:5173. Si ya tienes PostgreSQL, crea una base de datos, configura `DATABASE_URL` y omite Docker Compose.
 
-El archivo `.env.example` usa valores de muestra para la base local. Configura `DOMINIO_INSTITUCIONAL` con el dominio exacto de la universidad, sin `@`. Con el valor de ejemplo puedes usar `estudiante@universidad.edu.co`. Si ajustas el puerto de PostgreSQL en Compose, cambia también el puerto en `DATABASE_URL`. Ejecuta los scripts desde la raíz para que Prisma encuentre `.env`.
+El archivo `.env.example` usa valores de muestra para la base local. Configura `DOMINIO_INSTITUCIONAL` con el dominio exacto de la universidad, sin `@`. Con el valor de ejemplo puedes usar `estudiante@unicartagena.edu.co`. Si ajustas el puerto de PostgreSQL en Compose, cambia también el puerto en `DATABASE_URL`. Ejecuta los scripts desde la raíz para que Prisma encuentre `.env`.
 
 ## Verificación
 
@@ -35,7 +37,7 @@ El archivo `.env.example` usa valores de muestra para la base local. Configura `
 | Método y ruta | Resultado |
 | --- | --- |
 | `GET /api/disciplinas` | Oferta pública con horarios y dominio institucional. |
-| `POST /api/postulaciones` | Acepta JSON con `nombre`, `documento`, `correo`, `programa`, `promedio` (número) y `disciplinaId`. Devuelve HTTP 201 con radicado, estado y fecha, o HTTP 422 con errores de validación por campo. |
+| `POST /api/postulaciones` | Acepta JSON con `nombre`, `documento`, `correo`, `campus`, `programa`, `promedio` (número) y `disciplinaId`. Devuelve HTTP 201 con radicado, estado y fecha, o HTTP 422 con errores de validación por campo. |
 
 ## Estructura
 

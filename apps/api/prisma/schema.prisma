@@ -48,6 +48,7 @@ model Postulacion {
   nombre       String           @db.VarChar(120)
   documento    String           @db.VarChar(40)
   correo       String           @map("correo_institucional") @db.VarChar(254)
+  campus       String?          @db.VarChar(80)
   programa     String           @map("programa_academico") @db.VarChar(120)
   promedio     Decimal          @db.Decimal(3, 2)
   estado       EstadoPostulacion @default(RECIBIDA)

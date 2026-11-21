@@ -1,6 +1,5 @@
 import { validarPostulacion } from '@bienestar/compartido';
 import type { Comprobante, Oferta } from '@bienestar/compartido';
-import { Prisma } from '@prisma/client';
 import { entorno } from '../config/entorno';
 import { consultarDisciplinas, guardarPostulacion } from '../repositorios/tps';
 
@@ -11,8 +10,9 @@ export async function obtenerOferta(): Promise<Oferta> {
   const disciplinas = await consultarDisciplinas();
   return {
     dominioInstitucional: entorno.dominioInstitucional,
-    disciplinas: disciplinas.map(({ horarios, ...disciplina }) => ({
+    disciplinas: disciplinas.map(({ horarios, _count, ...disciplina }) => ({
       ...disciplina,
+      cuposDisponibles: Math.max(0, disciplina.cupoMaximo - _count.postulaciones),
       horarios: horarios.map(({ dia, inicio, fin }) => ({
         dia: dias[dia - 1],
         inicio: inicio.toISOString().slice(11, 16),
@@ -23,7 +23,7 @@ export async function obtenerOferta(): Promise<Oferta> {
 }
 
 export async function registrarPostulacion(entrada: unknown): Promise<
-  { comprobante: Comprobante } | { errores: Record<string, string> }
+  { comprobante: Comprobante } | { errores: Record<string, string>; cupoAgotado?: true }
 > {
   const validacion = esquema.safeParse(entrada);
   if (!validacion.success) {
@@ -34,13 +34,13 @@ export async function registrarPostulacion(entrada: unknown): Promise<
     return { errores };
   }
 
-  try {
-    const registro = await guardarPostulacion(validacion.data);
-    return { comprobante: { ...registro, creadaEn: registro.creadaEn.toISOString() } };
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
-      return { errores: { disciplinaId: 'La disciplina seleccionada ya no está disponible.' } };
-    }
-    throw error;
+  const guardado = await guardarPostulacion(validacion.data);
+  if (guardado.resultado === 'inexistente') {
+    return { errores: { disciplinaId: 'La disciplina seleccionada ya no está disponible.' } };
   }
+  if (guardado.resultado === 'agotado') {
+    return { cupoAgotado: true, errores: { disciplinaId: 'No quedan cupos en esta disciplina. Elige otra.' } };
+  }
+  const { registro, cuposDisponibles } = guardado;
+  return { comprobante: { ...registro, creadaEn: registro.creadaEn.toISOString(), cuposDisponibles } };
 }

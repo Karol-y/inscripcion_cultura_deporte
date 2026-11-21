@@ -3,7 +3,7 @@ import type { Comprobante, Oferta, Postulacion } from '@bienestar/compartido';
 export type Errores = Record<string, string>;
 
 export class ErrorApi extends Error {
-  constructor(mensaje: string, readonly errores: Errores = {}) {
+  constructor(mensaje: string, readonly errores: Errores = {}, readonly estado?: number) {
     super(mensaje);
   }
 }
@@ -17,7 +17,7 @@ async function solicitar<T>(url: string, opciones?: RequestInit): Promise<T> {
   }
   const datos = await respuesta.json().catch(() => null);
   if (!respuesta.ok || datos === null) {
-    throw new ErrorApi(datos?.mensaje ?? 'El servicio no está disponible. Intenta nuevamente.', datos?.errores);
+    throw new ErrorApi(datos?.mensaje ?? 'El servicio no está disponible. Intenta nuevamente.', datos?.errores, respuesta.status);
   }
   return datos as T;
 }

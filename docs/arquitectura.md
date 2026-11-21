@@ -55,6 +55,7 @@ erDiagram
         string nombre
         string documento
         string correo_institucional
+        string campus
         string programa_academico
         decimal promedio
         string estado

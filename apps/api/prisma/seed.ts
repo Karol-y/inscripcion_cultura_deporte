@@ -10,6 +10,48 @@ const oferta = [
   { nombre: 'Música', tipo: 'CULTURA', descripcion: 'Desarrolla habilidades musicales en un ensamble universitario.', cupoMaximo: 15, dias: [5], inicio: '15:00', fin: '17:00' },
 ] as const;
 
+const deportesSinHorario = [
+  'Ajedrez',
+  'Atletismo',
+  'Bádminton',
+  'Fútbol Sala',
+  'Karate-do',
+  'Kickball',
+  'Levantamiento de pesas',
+  'Softbol',
+  'Taekwondo',
+  'Tenis',
+  'Tenis de mesa',
+  'Rugby',
+];
+
+const culturaSinHorario = [
+  'Banda sabanera 6 octubre',
+  'Cine clubes',
+  'Comité cultural de medicina',
+  'Coral societas',
+  'Coro San Agustín',
+  'Danzas modernas semillero',
+  'Danzas modernas base',
+  'Danzas y música folclóricas de la UdeC',
+  'Grupo musical folclórico Corinche',
+  'Grupo Gaita, Maraca y Tambó',
+  'Grupo logístico "Gente pa yá"',
+  'Grupo de dibujo exmedi',
+  'Grupo de fotografía y lettering',
+  'Grupo musical pop rock',
+  'Grupo de teatro Utopía',
+  'Grupo de teatro TEUC',
+  'Grupo Vallenato UdeC',
+  'Grupo pop rock',
+  'Orquesta tropical UdeC',
+  'Grupo de porrismo',
+  'Taller de guitarra',
+  'Taller de ritmo y tambora',
+];
+
+const cupoInicial = 20;
+
 function hora(valor: string) {
   return new Date(`1970-01-01T${valor}:00Z`);
 }
@@ -26,8 +68,19 @@ async function cargarOferta() {
         },
       });
     }
+    await tx.disciplina.createMany({
+      data: [
+        ...deportesSinHorario.map((nombre) => ({
+          nombre, tipo: 'DEPORTE' as const, descripcion: 'Disciplina deportiva de Bienestar Universitario.', cupoMaximo: cupoInicial,
+        })),
+        ...culturaSinHorario.map((nombre) => ({
+          nombre, tipo: 'CULTURA' as const, descripcion: 'Actividad cultural de Bienestar Universitario.', cupoMaximo: cupoInicial,
+        })),
+      ],
+      skipDuplicates: true,
+    });
   });
-  console.log('Oferta de ejemplo disponible.');
+  console.log('Oferta de disciplinas disponible.');
 }
 
 cargarOferta().catch((error: unknown) => {
