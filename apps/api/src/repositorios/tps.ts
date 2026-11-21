@@ -19,8 +19,8 @@ export function consultarDisciplinas() {
 export function guardarPostulacion(datos: Postulacion) {
   return prisma.$transaction(async (tx) => {
     // Serializa las reservas de una misma disciplina antes de contar sus postulaciones.
-    const [disciplina] = await tx.$queryRaw<{ cupo_maximo: number }[]>`
-      SELECT cupo_maximo FROM disciplinas WHERE id = ${datos.disciplinaId}::uuid AND publicada = true FOR UPDATE
+    const [disciplina] = await tx.$queryRaw<{ cupo_maximo: number; nombre: string }[]>`
+      SELECT cupo_maximo, nombre FROM disciplinas WHERE id = ${datos.disciplinaId}::uuid AND publicada = true FOR UPDATE
     `;
     if (!disciplina) return { resultado: 'inexistente' } as const;
 
@@ -32,6 +32,6 @@ export function guardarPostulacion(datos: Postulacion) {
       data: datos,
       select: { id: true, estado: true, creadaEn: true },
     });
-    return { resultado: 'guardado', registro, cuposDisponibles: disponibles - 1 } as const;
+    return { resultado: 'guardado', registro, nombreDisciplina: disciplina.nombre, cuposDisponibles: disponibles - 1 } as const;
   }, { isolationLevel: 'ReadCommitted' });
 }

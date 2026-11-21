@@ -26,7 +26,7 @@ export async function obtenerOferta(): Promise<Oferta> {
   };
 }
 
-async function enviarAGoogleSheets(datos: Postulacion, radicado: string) {
+async function enviarAGoogleSheets(datos: Postulacion, radicado: string, nombreDisciplina: string) {
   const url = process.env.GOOGLE_SHEETS_WEBHOOK_URL?.trim();
   const token = process.env.WEBHOOK_TOKEN?.trim();
   if (!url && !token) return;
@@ -40,7 +40,8 @@ async function enviarAGoogleSheets(datos: Postulacion, radicado: string) {
     const respuesta = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...datos, radicado, token }),
+      // El Apps Script publicado lee disciplinaId para llenar la columna Disciplina.
+      body: JSON.stringify({ ...datos, disciplinaId: nombreDisciplina, radicado, token }),
       signal: AbortSignal.timeout(10_000),
     });
     if (!respuesta.ok || (await respuesta.json())?.ok !== true) {
@@ -70,7 +71,7 @@ export async function registrarPostulacion(entrada: unknown): Promise<
   if (guardado.resultado === 'agotado') {
     return { cupoAgotado: true, errores: { disciplinaId: 'No quedan cupos en esta disciplina. Elige otra.' } };
   }
-  const { registro, cuposDisponibles } = guardado;
-  await enviarAGoogleSheets(validacion.data, registro.id);
+  const { registro, nombreDisciplina, cuposDisponibles } = guardado;
+  await enviarAGoogleSheets(validacion.data, registro.id, nombreDisciplina);
   return { comprobante: { ...registro, creadaEn: registro.creadaEn.toISOString(), cuposDisponibles } };
 }
