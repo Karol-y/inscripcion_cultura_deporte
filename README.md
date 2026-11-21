@@ -2,7 +2,7 @@
 
 La Iteración 1 implementa HU1 y HU2. El catálogo público muestra disciplinas deportivas y culturales. Para las nuevas disciplinas se usan 20 cupos iniciales de desarrollo y se muestran los horarios como «Por definir». El formulario guarda la postulación con fecha, estado `RECIBIDA` y un radicado.
 
-Cada postulación recibida reserva un cupo. El catálogo muestra los cupos restantes de cada disciplina y la API devuelve HTTP 409 si la disciplina se agotó. Los cupos máximos de la oferta de ejemplo se definen en `apps/api/prisma/seed.ts` al crear las disciplinas.
+Cada postulación recibida reserva un cupo. El catálogo muestra los cupos restantes de cada disciplina y la API devuelve HTTP 409 si la disciplina se agotó. Los cupos máximos de ejemplo se asignan al crear las disciplinas. Para editar los ensayos de Cultura, modifica [oferta-cultural.ts](apps/api/prisma/oferta-cultural.ts) y ejecuta `npm run db:seed`. Cada grupo de días va del 1 (lunes) al 7 (domingo), con horas en formato de 24 horas. El seed publica únicamente las fichas culturales de ese archivo y sincroniza sus horarios. Las fichas retiradas conservan el historial de postulaciones.
 
 ## Requisitos
 

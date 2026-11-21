@@ -3,6 +3,7 @@ import { prisma } from '../config/prisma';
 
 export function consultarDisciplinas() {
   return prisma.disciplina.findMany({
+    where: { publicada: true },
     orderBy: [{ tipo: 'asc' }, { nombre: 'asc' }],
     select: {
       id: true, nombre: true, tipo: true, descripcion: true, cupoMaximo: true,
@@ -19,7 +20,7 @@ export function guardarPostulacion(datos: Postulacion) {
   return prisma.$transaction(async (tx) => {
     // Serializa las reservas de una misma disciplina antes de contar sus postulaciones.
     const [disciplina] = await tx.$queryRaw<{ cupo_maximo: number }[]>`
-      SELECT cupo_maximo FROM disciplinas WHERE id = ${datos.disciplinaId}::uuid FOR UPDATE
+      SELECT cupo_maximo FROM disciplinas WHERE id = ${datos.disciplinaId}::uuid AND publicada = true FOR UPDATE
     `;
     if (!disciplina) return { resultado: 'inexistente' } as const;
 

@@ -23,6 +23,7 @@ model Disciplina {
   descripcion   String
   cupoMaximo    Int           @default(0) @map("cupo_maximo")
   inscritos     Int           @default(0)
+  publicada     Boolean       @default(true)
   horarios      Horario[]
   postulaciones Postulacion[]
 

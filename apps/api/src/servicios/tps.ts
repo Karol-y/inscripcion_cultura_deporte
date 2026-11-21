@@ -8,6 +8,10 @@ const esquema = validarPostulacion(entorno.dominioInstitucional);
 
 export async function obtenerOferta(): Promise<Oferta> {
   const disciplinas = await consultarDisciplinas();
+  disciplinas.sort((a, b) =>
+    Number(a.tipo === 'CULTURA') - Number(b.tipo === 'CULTURA')
+    || (a.tipo === 'CULTURA' ? a.nombre.localeCompare(b.nombre, 'es-CO') : 0),
+  );
   return {
     dominioInstitucional: entorno.dominioInstitucional,
     disciplinas: disciplinas.map(({ horarios, _count, ...disciplina }) => ({

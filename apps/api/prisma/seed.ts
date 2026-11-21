@@ -1,13 +1,12 @@
 import { PrismaClient } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
+import { ofertaCultural } from './oferta-cultural';
 
 const prisma = new PrismaClient();
-const oferta = [
+const ofertaDeportiva = [
   { nombre: 'Fútbol', tipo: 'DEPORTE', descripcion: 'Practica fundamentos técnicos y juego en equipo en la cancha universitaria.', cupoMaximo: 24, dias: [2, 4], inicio: '16:00', fin: '18:00' },
   { nombre: 'Baloncesto', tipo: 'DEPORTE', descripcion: 'Entrena pases, lanzamientos y estrategias de juego colectivo.', cupoMaximo: 18, dias: [1, 3], inicio: '15:00', fin: '17:00' },
   { nombre: 'Voleibol', tipo: 'DEPORTE', descripcion: 'Desarrolla técnica de saque, recepción y ataque en equipo.', cupoMaximo: 18, dias: [2, 5], inicio: '14:00', fin: '16:00' },
-  { nombre: 'Danza', tipo: 'CULTURA', descripcion: 'Explora ritmos colombianos y expresión corporal en grupo.', cupoMaximo: 20, dias: [1, 3], inicio: '17:00', fin: '19:00' },
-  { nombre: 'Teatro', tipo: 'CULTURA', descripcion: 'Trabaja improvisación, voz y creación escénica en colectivo.', cupoMaximo: 16, dias: [4], inicio: '16:00', fin: '18:00' },
-  { nombre: 'Música', tipo: 'CULTURA', descripcion: 'Desarrolla habilidades musicales en un ensamble universitario.', cupoMaximo: 15, dias: [5], inicio: '15:00', fin: '17:00' },
 ] as const;
 
 const deportesSinHorario = [
@@ -25,40 +24,74 @@ const deportesSinHorario = [
   'Rugby',
 ];
 
-const culturaSinHorario = [
-  'Banda sabanera 6 octubre',
-  'Cine clubes',
-  'Comité cultural de medicina',
-  'Coral societas',
-  'Coro San Agustín',
-  'Danzas modernas semillero',
-  'Danzas modernas base',
-  'Danzas y música folclóricas de la UdeC',
-  'Grupo musical folclórico Corinche',
-  'Grupo Gaita, Maraca y Tambó',
-  'Grupo logístico "Gente pa yá"',
-  'Grupo de dibujo exmedi',
-  'Grupo de fotografía y lettering',
-  'Grupo musical pop rock',
-  'Grupo de teatro Utopía',
-  'Grupo de teatro TEUC',
-  'Grupo Vallenato UdeC',
-  'Grupo pop rock',
-  'Orquesta tropical UdeC',
-  'Grupo de porrismo',
-  'Taller de guitarra',
-  'Taller de ritmo y tambora',
-];
-
 const cupoInicial = 20;
+const danzasModernas = 'Danzas modernas y urbanas grupo base y semillero';
+const fichasAnteriores = ['Danzas modernas base', 'Danzas modernas semillero'];
 
 function hora(valor: string) {
   return new Date(`1970-01-01T${valor}:00Z`);
 }
 
+async function unificarDanzasModernas(tx: Prisma.TransactionClient) {
+  const fichas = await tx.disciplina.findMany({
+    where: { tipo: 'CULTURA', nombre: { in: [danzasModernas, ...fichasAnteriores] } },
+    select: { id: true, nombre: true },
+  });
+  const fichaPrincipal = [danzasModernas, ...fichasAnteriores]
+    .map((nombre) => fichas.find((ficha) => ficha.nombre === nombre)).find(Boolean);
+  if (!fichaPrincipal) return;
+
+  for (const ficha of fichas) {
+    if (ficha.id === fichaPrincipal.id) continue;
+    await tx.postulacion.updateMany({
+      where: { disciplinaId: ficha.id },
+      data: { disciplinaId: fichaPrincipal.id },
+    });
+    await tx.horario.deleteMany({ where: { disciplinaId: ficha.id } });
+    await tx.disciplina.delete({ where: { id: ficha.id } });
+  }
+  if (fichaPrincipal.nombre !== danzasModernas) {
+    await tx.disciplina.update({ where: { id: fichaPrincipal.id }, data: { nombre: danzasModernas } });
+  }
+}
+
+async function cargarCultura(tx: Prisma.TransactionClient) {
+  await unificarDanzasModernas(tx);
+  await tx.disciplina.updateMany({
+    where: { tipo: 'CULTURA', publicada: true, nombre: { notIn: ofertaCultural.map(({ nombre }) => nombre) } },
+    data: { publicada: false },
+  });
+  for (const { nombre, descripcion, horarios } of ofertaCultural) {
+    const disciplina = await tx.disciplina.upsert({
+      where: { nombre },
+      update: { publicada: true },
+      create: {
+        nombre, tipo: 'CULTURA',
+        descripcion: descripcion ?? 'Actividad cultural de Bienestar Universitario.',
+        cupoMaximo: cupoInicial,
+      },
+      select: { id: true, horarios: { select: { dia: true, inicio: true, fin: true } } },
+    });
+
+    const nuevos = horarios.flatMap(({ dias, inicio, fin }) =>
+      dias.map((dia) => ({ dia, inicio: hora(inicio), fin: hora(fin) })),
+    );
+    if (disciplina.horarios.length === nuevos.length && nuevos.every((nuevo) =>
+      disciplina.horarios.some((actual) => actual.dia === nuevo.dia
+        && actual.inicio.getTime() === nuevo.inicio.getTime()
+        && actual.fin.getTime() === nuevo.fin.getTime()),
+    )) continue;
+
+    await tx.horario.deleteMany({ where: { disciplinaId: disciplina.id } });
+    if (nuevos.length > 0) {
+      await tx.horario.createMany({ data: nuevos.map((horario) => ({ ...horario, disciplinaId: disciplina.id })) });
+    }
+  }
+}
+
 async function cargarOferta() {
   await prisma.$transaction(async (tx) => {
-    for (const { dias, inicio, fin, ...datos } of oferta) {
+    for (const { dias, inicio, fin, ...datos } of ofertaDeportiva) {
       await tx.disciplina.upsert({
         where: { nombre: datos.nombre },
         update: {},
@@ -73,13 +106,11 @@ async function cargarOferta() {
         ...deportesSinHorario.map((nombre) => ({
           nombre, tipo: 'DEPORTE' as const, descripcion: 'Disciplina deportiva de Bienestar Universitario.', cupoMaximo: cupoInicial,
         })),
-        ...culturaSinHorario.map((nombre) => ({
-          nombre, tipo: 'CULTURA' as const, descripcion: 'Actividad cultural de Bienestar Universitario.', cupoMaximo: cupoInicial,
-        })),
       ],
       skipDuplicates: true,
     });
-  });
+    await cargarCultura(tx);
+  }, { timeout: 15_000 });
   console.log('Oferta de disciplinas disponible.');
 }
 

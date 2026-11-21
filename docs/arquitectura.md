@@ -31,6 +31,7 @@ erDiagram
         string descripcion
         int cupo_maximo
         int inscritos
+        boolean publicada
         uuid jefe_area_id FK
     }
     HORARIOS {
